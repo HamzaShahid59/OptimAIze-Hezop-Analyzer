@@ -3,7 +3,6 @@ import json
 import re
 import os
 from difflib import SequenceMatcher
-import random
 from dotenv import load_dotenv
 from openai import OpenAI  # new-style OpenAI client
 
@@ -34,7 +33,7 @@ try:
     with open("classified_pipeline_tags2.json", "r", encoding="utf-8") as f:
         DATA = json.load(f)
 except FileNotFoundError:
-    st.error("❌ Data file 'classified_pipeline_tags2.json' not found in the app directory.")
+    st.error("❌ 'classified_pipeline_tags2.json' not found in the app directory.")
     st.stop()
 except json.JSONDecodeError:
     st.error(
@@ -252,7 +251,7 @@ def build_fewshot_examples():
     ]
 
 # ==========================
-# Session State Initialization
+# Session State Initialization (MEMORY)
 # ==========================
 if "system_message" not in st.session_state:
     st.session_state.system_message = {
@@ -264,22 +263,33 @@ if "system_message" not in st.session_state:
             "- Carefully read EquipmentSpec and other fields for matching tags.\n"
             "- For questions about temperature, capacity, volume, or operating range, "
             "extract these values directly from EquipmentSpec.\n"
+            "- Use the entire conversation history to keep track of context.\n"
             "- Do NOT say that information is not available if it actually appears "
             "anywhere in the JSON context.\n"
-            "- If you genuinely cannot find the information in the JSON, then say "
-            "\"this information is not available in the provided data.\""
+            '- If you genuinely cannot find the information in the JSON, then say '
+            '"this information is not available in the provided data."'
         ),
     }
 
 if "few_shots" not in st.session_state:
     st.session_state.few_shots = build_fewshot_examples()
 
-# chat_history: ONLY real user & assistant messages that should be displayed
+# chat_history: ONLY real user & assistant messages that should be displayed and used as memory
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if "last_reference" not in st.session_state:
     st.session_state.last_reference = None  # track last tag discussed
+
+# ==========================
+# Memory control: reset button
+# ==========================
+col1, col2 = st.columns([1, 5])
+with col1:
+    if st.button("🔁 Reset chat / clear memory"):
+        st.session_state.chat_history = []
+        st.session_state.last_reference = None
+        st.rerun()
 
 # ==========================
 # Display previous conversation
@@ -299,11 +309,11 @@ if user_input:
         if st.session_state.last_reference:
             user_input = f"{user_input} (Refers to {st.session_state.last_reference})"
 
-    # Show user message in UI and store in chat_history
+    # Show user message in UI and store in chat_history (MEMORY)
     st.chat_message("user").markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
-    # Build local context
+    # Build local context for CURRENT question
     context = build_local_context(user_input)
     context_text = summarize_context(context)
 
@@ -315,7 +325,7 @@ if user_input:
 
     # ==========================
     # Prepare messages for the model
-    #   system + few_shots + full chat_history + extra system context
+    # MEMORY = entire chat_history is included here
     # ==========================
     messages = (
         [st.session_state.system_message]
@@ -340,6 +350,6 @@ if user_input:
     except Exception as e:
         reply = f"⚠️ Error calling GPT: {str(e)}"
 
-    # Show assistant reply in UI and store in chat_history
+    # Show assistant reply and store in chat_history (MEMORY)
     st.chat_message("assistant").markdown(reply)
     st.session_state.chat_history.append({"role": "assistant", "content": reply})
