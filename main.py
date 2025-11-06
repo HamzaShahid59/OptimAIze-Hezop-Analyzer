@@ -5,25 +5,26 @@ import os
 from difflib import SequenceMatcher
 import random
 from dotenv import load_dotenv
-from openai import OpenAI  # ✅ modern client for openai>=1.0.0
+from openai import OpenAI  # new-style OpenAI client
 
 # ==========================
 # Streamlit Page Config
 # ==========================
-st.set_page_config(page_title="🧠 P&ID Analysis Chatbot", layout="wide")
+st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
 st.title("🧠 P&ID Analysis Chatbot")
 
 # ==========================
-# Load environment variables
+# Load environment variables from .env
 # ==========================
 load_dotenv()
-api_key = os.getenv("OPEN_AI_KEY")
 
+# Read key from .env / environment as OPEN_AI_KEY
+api_key = os.getenv("OPEN_AI_KEY")
 if not api_key:
     st.error("❌ No API key found. Please set OPEN_AI_KEY in your .env file.")
     st.stop()
 
-# Initialize client
+# Initialize OpenAI client (for openai>=1.0.0, including 2.7.x)
 client = OpenAI(api_key=api_key)
 
 # ==========================
@@ -33,10 +34,13 @@ try:
     with open("classified_pipeline_tags2.json", "r", encoding="utf-8") as f:
         DATA = json.load(f)
 except FileNotFoundError:
-    st.error("❌ Missing 'classified_pipeline_tags2.json' file.")
+    st.error("❌ Data file 'classified_pipeline_tags2.json' not found in the app directory.")
     st.stop()
 except json.JSONDecodeError:
-    st.error("❌ Invalid JSON in 'classified_pipeline_tags2.json'. Please check format.")
+    st.error(
+        "❌ 'classified_pipeline_tags2.json' is not valid JSON. "
+        "Make sure it is generated correctly and committed."
+    )
     st.stop()
 
 PIPELINES = DATA.get("complete_pipeline_flows", {})
@@ -50,11 +54,17 @@ def normalize_tag(tag: str) -> str:
         return ""
     return re.sub(r"[^a-zA-Z0-9]", "", tag).lower()
 
+
 def similarity(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
+
 def find_best_tag_matches(query, data_list, threshold=0.6):
-    """Finds equipment/instrument/valve tags matching query."""
+    """
+    Improved matcher:
+    - First do simple substring match of Tag in the raw query.
+    - Fallback to fuzzy similarity on normalized strings.
+    """
     results = []
     if not data_list:
         return results
@@ -67,87 +77,143 @@ def find_best_tag_matches(query, data_list, threshold=0.6):
         tag_lower = tag.lower()
         tag_norm = normalize_tag(tag)
 
+        # Direct substring match on raw text (strong signal)
         if tag_lower and tag_lower in q_raw:
             results.append(item)
-        elif tag_norm and similarity(q_norm, tag_norm) >= threshold:
+            continue
+
+        # Fuzzy match as backup
+        if tag_norm and similarity(q_norm, tag_norm) >= threshold:
             results.append(item)
 
     return results
 
+
 def find_pipeline_matches(query, threshold=0.6):
-    """Find pipeline matches by tag or fuzzy match."""
-    matches = {}
+    """
+    Improved pipeline matcher:
+    - Direct substring match of pipeline tag in query.
+    - Fallback to fuzzy similarity.
+    """
     q_raw = query.lower()
     q_norm = normalize_tag(query)
+    matches = {}
 
     for pipe_tag, pipe_info in PIPELINES.items():
         tag_lower = pipe_tag.lower()
         tag_norm = normalize_tag(pipe_tag)
-        if tag_lower in q_raw or similarity(q_norm, tag_norm) >= threshold:
+
+        if tag_lower in q_raw:
             matches[pipe_tag] = pipe_info
+            continue
+
+        if similarity(q_norm, tag_norm) >= threshold:
+            matches[pipe_tag] = pipe_info
+
     return matches
 
-def extract_all_equipment_like_objects():
-    """Extract all equipment (including start/end from pipelines)."""
-    equipment_list = PROCESS_DATA.get("Equipment", []).copy()
-    for pipe_tag, pipe in PIPELINES.items():
-        for end in ["start", "end"]:
-            node = pipe.get(end, {})
-            if node.get("category") == "equipment" and node.get("details"):
-                equipment_list.append(node["details"])
-    return equipment_list
 
 def build_local_context(query):
-    """Build a detailed context from JSON for the model."""
+    """
+    Build a local context tailored to the query:
+    - Matches equipment/instrumentation/handvalves by tag or similarity.
+    - Matches pipelines by tag or similarity.
+    - When a pipeline is matched, also pulls its start/end equipment details
+      into the equipment context so things like temperature/capacity of B440
+      are available.
+    """
     context = {"equipment": [], "instrumentation": [], "handvalves": [], "pipelines": {}}
     q = query.lower()
-    all_equipment = extract_all_equipment_like_objects()
 
-    context["equipment"] = find_best_tag_matches(query, all_equipment)
-    context["instrumentation"] = find_best_tag_matches(query, PROCESS_DATA.get("Instrumentation", []))
-    context["handvalves"] = find_best_tag_matches(query, PROCESS_DATA.get("HandValves", []))
-    context["pipelines"] = find_pipeline_matches(query)
+    # General category queries
+    if any(word in q for word in ["pipeline", "line", "flow path", "pipe"]):
+        context["pipelines"] = PIPELINES
+    elif any(word in q for word in ["equipment", "pump", "tank", "vessel", "reactor"]):
+        context["equipment"] = PROCESS_DATA.get("Equipment", [])
+    elif any(word in q for word in ["instrument", "valve", "controller", "sensor"]):
+        context["instrumentation"] = PROCESS_DATA.get("Instrumentation", [])
+        context["handvalves"] = PROCESS_DATA.get("HandValves", [])
+    else:
+        # Specific tag / free-text search
+        context["equipment"] = find_best_tag_matches(query, PROCESS_DATA.get("Equipment", []))
+        context["instrumentation"] = find_best_tag_matches(
+            query, PROCESS_DATA.get("Instrumentation", [])
+        )
+        context["handvalves"] = find_best_tag_matches(
+            query, PROCESS_DATA.get("HandValves", [])
+        )
+        context["pipelines"] = find_pipeline_matches(query)
 
-    # Pull start/end equipment for matched pipelines
-    for pipe_info in context["pipelines"].values():
-        for end in ["start", "end"]:
-            node = pipe_info.get(end, {})
-            if node.get("details"):
-                context["equipment"].append(node["details"])
+    # If pipelines were matched, pull their start/end equipment into equipment context
+    if context["pipelines"]:
+        existing_tags = {e.get("Tag") for e in context["equipment"]}
+        for pipe_info in context["pipelines"].values():
+            for end_key in ["start", "end"]:
+                node = pipe_info.get(end_key, {})
+                if node.get("category") == "equipment":
+                    det = node.get("details") or {}
+                    tag = det.get("Tag")
+                    if det and tag and tag not in existing_tags:
+                        context["equipment"].append(det)
+                        existing_tags.add(tag)
 
     return context
 
+
 def summarize_context(context):
-    """Format local context into readable text for GPT."""
+    """
+    Turn the local context into a compact, very-readable text
+    so the model can easily see specs like temperature and capacity.
+    """
     lines = []
 
     if context["equipment"]:
-        lines.append("Equipment found:")
+        lines.append("Equipment:")
         for e in context["equipment"]:
-            lines.append(
-                f"- Tag: {e.get('Tag')} | Type: {e.get('Type')} | "
-                f"Spec: {e.get('EquipmentSpec')} | Area: {e.get('Area')}"
-            )
+            tag = e.get("Tag", "")
+            typ = e.get("Type", "")
+            spec = e.get("EquipmentSpec", "")
+            lines.append(f"- {tag} (type {typ}): spec = {spec}")
 
     if context["instrumentation"]:
-        lines.append("\nInstrumentation found:")
+        lines.append("Instrumentation:")
         for i in context["instrumentation"]:
-            lines.append(f"- Tag: {i.get('Tag')} | Type: {i.get('Type')} | Details: {i.get('Details')}")
+            tag = i.get("Tag", "")
+            typ = i.get("Type", "")
+            details = i.get("Details", "")
+            lines.append(f"- {tag} (type {typ}): details = {details}")
+
+    if context["handvalves"]:
+        lines.append("Hand valves:")
+        for h in context["handvalves"]:
+            tag = h.get("Tag", "")
+            code = h.get("Code", "")
+            normally = h.get("Normally", "")
+            lines.append(f"- {tag} (code {code}, normally {normally})")
 
     if context["pipelines"]:
-        lines.append("\nPipelines found:")
-        for tag, p in context["pipelines"].items():
-            start = (p.get("start", {}).get("details") or {}).get("Tag", p.get("start", {}).get("tag"))
-            end = (p.get("end", {}).get("details") or {}).get("Tag", p.get("end", {}).get("tag"))
-            lines.append(f"- {tag} connects {start} → {end}")
+        lines.append("Pipelines:")
+        for tag, info in context["pipelines"].items():
+            start = info.get("start", {})
+            end = info.get("end", {})
+            s_tag = (start.get("details") or {}).get("Tag") or start.get("tag", "unknown")
+            e_tag = (end.get("details") or {}).get("Tag") or end.get("tag", "unknown")
+            lines.append(f"- {tag}: from {s_tag} to {e_tag}")
 
-    return "\n".join(lines) if lines else "No relevant data found."
+    if not lines:
+        return "No matching data found in plant model."
+
+    return "\n".join(lines)
 
 # ==========================
-# Prompt Configuration
+# Few-Shot Examples (STATIC)
+# Used only for the model, not shown in UI
 # ==========================
 def build_fewshot_examples():
-    """Few-shots showing model how to extract temperature/capacity from EquipmentSpec."""
+    """
+    Static few-shots that demonstrate how to read EquipmentSpec
+    and answer about temperature / capacity from the JSON context.
+    """
     return [
         {
             "role": "user",
@@ -157,8 +223,8 @@ def build_fewshot_examples():
             "role": "assistant",
             "content": (
                 "According to the JSON context, equipment b440 has "
-                "EquipmentSpec 'Tank DMPSA 1 m^3 Temp = 50-60°C'. "
-                "Therefore, its temperature range is 50–60°C."
+                'EquipmentSpec "Tank DMPSA 1 m^3 Temp = 50-60°C". '
+                "So the temperature range is 50–60°C."
             ),
         },
         {
@@ -168,19 +234,19 @@ def build_fewshot_examples():
         {
             "role": "assistant",
             "content": (
-                "From the EquipmentSpec of b440 ('Tank DMPSA 1 m^3 Temp = 50-60°C'), "
-                "the tank capacity is 1 m³."
+                "From the same EquipmentSpec for b440, the tank capacity is 1 m^3."
             ),
         },
         {
             "role": "user",
-            "content": "If data is missing, what should you say?",
+            "content": "If the information is not in the JSON, what should you say?",
         },
         {
             "role": "assistant",
             "content": (
-                "If a tag truly does not exist in the JSON context, say: "
-                "'That information does not exist in the provided JSON data.'"
+                "If the requested detail is not present anywhere in the provided JSON "
+                "context, I should clearly say that this specific information is not "
+                "available in the data."
             ),
         },
     ]
@@ -192,41 +258,48 @@ if "system_message" not in st.session_state:
     st.session_state.system_message = {
         "role": "system",
         "content": (
-            "You are a process engineer assistant with full access to a JSON-based P&ID model.\n"
-            "You must answer using only the 'Relevant plant data' provided to you.\n"
-            "When EquipmentSpec includes values like temperature or capacity, extract them explicitly.\n"
-            "Never say 'information not available' if it appears anywhere in the JSON context.\n"
-            "If it’s truly missing, respond with: 'That information does not exist in the provided JSON data.'"
+            "You are a process engineer expert in P&ID and HAZOP interpretation. "
+            "You answer ONLY using the JSON plant data that is provided to you in the "
+            "'Relevant plant data' system message.\n\n"
+            "- Carefully read EquipmentSpec and other fields for matching tags.\n"
+            "- For questions about temperature, capacity, volume, or operating range, "
+            "extract these values directly from EquipmentSpec.\n"
+            "- Do NOT say that information is not available if it actually appears "
+            "anywhere in the JSON context.\n"
+            "- If you genuinely cannot find the information in the JSON, then say "
+            "\"this information is not available in the provided data.\""
         ),
     }
 
 if "few_shots" not in st.session_state:
     st.session_state.few_shots = build_fewshot_examples()
 
+# chat_history: ONLY real user & assistant messages that should be displayed
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 if "last_reference" not in st.session_state:
-    st.session_state.last_reference = None
+    st.session_state.last_reference = None  # track last tag discussed
 
 # ==========================
-# Display chat history
+# Display previous conversation
+# (only user + assistant messages, no system, no few-shots)
 # ==========================
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ==========================
-# User Input
+# Chat Input
 # ==========================
 user_input = st.chat_input("Ask about any equipment, pipeline, or instrument...")
-
 if user_input:
-    # Handle pronoun references
+    # Update reference context if user refers to 'it' etc.
     if any(word in user_input.lower() for word in ["it", "this", "that", "its"]):
         if st.session_state.last_reference:
             user_input = f"{user_input} (Refers to {st.session_state.last_reference})"
 
+    # Show user message in UI and store in chat_history
     st.chat_message("user").markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
@@ -234,21 +307,30 @@ if user_input:
     context = build_local_context(user_input)
     context_text = summarize_context(context)
 
-    # Update last reference
+    # Track last referenced tag (prefer equipment tag)
     if context["equipment"]:
-        st.session_state.last_reference = context["equipment"][0].get("Tag")
+        st.session_state.last_reference = context["equipment"][0].get("Tag", None)
     elif context["pipelines"]:
         st.session_state.last_reference = list(context["pipelines"].keys())[0]
 
-    # Build final prompt
+    # ==========================
+    # Prepare messages for the model
+    #   system + few_shots + full chat_history + extra system context
+    # ==========================
     messages = (
         [st.session_state.system_message]
         + st.session_state.few_shots
         + st.session_state.chat_history
-        + [{"role": "system", "content": f"Relevant plant data:\n{context_text}"}]
+        + [
+            {
+                "role": "system",
+                "content": f"Relevant plant data:\n{context_text}",
+            }
+        ]
     )
 
     try:
+        # Call OpenAI Chat Completions API
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
@@ -256,7 +338,8 @@ if user_input:
         )
         reply = response.choices[0].message.content
     except Exception as e:
-        reply = f"⚠️ GPT error: {str(e)}"
+        reply = f"⚠️ Error calling GPT: {str(e)}"
 
+    # Show assistant reply in UI and store in chat_history
     st.chat_message("assistant").markdown(reply)
     st.session_state.chat_history.append({"role": "assistant", "content": reply})
