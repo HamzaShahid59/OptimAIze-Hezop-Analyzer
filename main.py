@@ -2,10 +2,16 @@ import streamlit as st
 import json
 import re
 import os
-import openai
 from difflib import SequenceMatcher
 import random
-from dotenv import load_dotenv  # <-- NEW
+from dotenv import load_dotenv
+from openai import OpenAI  # ✅ new-style OpenAI client
+
+# ==========================
+# Streamlit Page Config
+# ==========================
+st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
+st.title("🧠 P&ID Analysis Chatbot")
 
 # ==========================
 # Load environment variables from .env
@@ -16,12 +22,11 @@ load_dotenv()
 # Read key from .env / environment as OPEN_AI_KEY
 api_key = os.getenv("OPEN_AI_KEY")
 if not api_key:
-    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
     st.error("❌ No API key found. Please set OPEN_AI_KEY in your .env file.")
     st.stop()
 
-# Configure OpenAI (classic-style client still works with many versions)
-openai.api_key = api_key
+# Initialize OpenAI client (for openai>=1.0.0, including 2.7.1)
+client = OpenAI(api_key=api_key)
 
 # ==========================
 # Load JSON Data
@@ -30,13 +35,13 @@ try:
     with open("classified_pipeline_tags2.json", "r", encoding="utf-8") as f:
         DATA = json.load(f)
 except FileNotFoundError:
-    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
     st.error("❌ Data file 'classified_pipeline_tags2.json' not found in the app directory.")
     st.stop()
 except json.JSONDecodeError:
-    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
-    st.error("❌ 'classified_pipeline_tags2.json' is not valid JSON. "
-             "Make sure it is generated correctly and committed.")
+    st.error(
+        "❌ 'classified_pipeline_tags2.json' is not valid JSON. "
+        "Make sure it is generated correctly and committed."
+    )
     st.stop()
 
 PIPELINES = DATA.get("complete_pipeline_flows", {})
@@ -48,10 +53,12 @@ PROCESS_DATA = DATA.get("process_data", {})
 def normalize_tag(tag: str) -> str:
     if not isinstance(tag, str):
         return ""
-    return re.sub(r'[^a-zA-Z0-9]', '', tag).lower()
+    return re.sub(r"[^a-zA-Z0-9]", "", tag).lower()
+
 
 def similarity(a, b):
     return SequenceMatcher(None, a, b).ratio()
+
 
 def find_best_tag_matches(query, data_dict, threshold=0.6):
     results = []
@@ -62,6 +69,7 @@ def find_best_tag_matches(query, data_dict, threshold=0.6):
             results.append(item)
     return results
 
+
 def find_pipeline_matches(query, threshold=0.6):
     q = normalize_tag(query)
     matches = {}
@@ -69,6 +77,7 @@ def find_pipeline_matches(query, threshold=0.6):
         if similarity(q, normalize_tag(pipe_tag)) >= threshold:
             matches[pipe_tag] = pipe_info
     return matches
+
 
 def build_local_context(query):
     context = {"equipment": [], "instrumentation": [], "handvalves": [], "pipelines": {}}
@@ -88,10 +97,15 @@ def build_local_context(query):
 
     # Specific tag searches
     context["equipment"] = find_best_tag_matches(query, PROCESS_DATA.get("Equipment", []))
-    context["instrumentation"] = find_best_tag_matches(query, PROCESS_DATA.get("Instrumentation", []))
-    context["handvalves"] = find_best_tag_matches(query, PROCESS_DATA.get("HandValves", []))
+    context["instrumentation"] = find_best_tag_matches(
+        query, PROCESS_DATA.get("Instrumentation", [])
+    )
+    context["handvalves"] = find_best_tag_matches(
+        query, PROCESS_DATA.get("HandValves", [])
+    )
     context["pipelines"] = find_pipeline_matches(query)
     return context
+
 
 def summarize_context(context):
     lines = []
@@ -122,52 +136,62 @@ def build_fewshot_examples():
     examples = []
     eq_list = PROCESS_DATA.get("Equipment", [])
     inst_list = PROCESS_DATA.get("Instrumentation", [])
+
     if eq_list:
         eq = random.choice(eq_list)
-        examples.append({
-            "role": "user",
-            "content": f"What are the specifications of equipment {eq.get('Tag','?')}?"
-        })
-        examples.append({
-            "role": "assistant",
-            "content": f"Equipment {eq.get('Tag','?')} has specifications as follows: {eq.get('EquipmentSpec','Not available')}."
-        })
+        examples.append(
+            {
+                "role": "user",
+                "content": f"What are the specifications of equipment {eq.get('Tag','?')}?",
+            }
+        )
+        examples.append(
+            {
+                "role": "assistant",
+                "content": f"Equipment {eq.get('Tag','?')} has specifications as follows: {eq.get('EquipmentSpec','Not available')}.",
+            }
+        )
+
     if inst_list:
         inst = random.choice(inst_list)
-        examples.append({
-            "role": "user",
-            "content": f"What is the operational state of instrument {inst.get('Tag','?')}?"
-        })
-        examples.append({
-            "role": "assistant",
-            "content": f"Instrument {inst.get('Tag','?')} is currently '{inst.get('Area','unknown')}'."
-        })
+        examples.append(
+            {
+                "role": "user",
+                "content": f"What is the operational state of instrument {inst.get('Tag','?')}?",
+            }
+        )
+        examples.append(
+            {
+                "role": "assistant",
+                "content": f"Instrument {inst.get('Tag','?')} is currently '{inst.get('Area','unknown')}'.",
+            }
+        )
+
     if PIPELINES:
         tag = random.choice(list(PIPELINES.keys()))
         pipe = PIPELINES[tag]
         start = pipe.get("start", {}).get("tag", "unknown")
         end = pipe.get("end", {}).get("tag", "unknown")
-        examples.append({
-            "role": "user",
-            "content": f"What does pipeline {tag} connect?"
-        })
-        examples.append({
-            "role": "assistant",
-            "content": f"Pipeline {tag} connects from {start} to {end}."
-        })
+        examples.append(
+            {
+                "role": "user",
+                "content": f"What does pipeline {tag} connect?",
+            }
+        )
+        examples.append(
+            {
+                "role": "assistant",
+                "content": f"Pipeline {tag} connects from {start} to {end}.",
+            }
+        )
+
     return examples
-
-# ==========================
-# Streamlit UI
-# ==========================
-st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
-st.title("🧠 P&ID Analysis Chatbot")
-
-few_shots = build_fewshot_examples()
 
 # ==========================
 # Memory Initialization
 # ==========================
+few_shots = build_fewshot_examples()
+
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -219,23 +243,13 @@ if user_input:
     ]
 
     try:
-        # Classic ChatCompletion API
-        response = openai.ChatCompletion.create(
+        # ✅ New-style chat completion for openai>=1.0.0
+        response = client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
             temperature=0.25,
         )
-
-        # Extract reply text robustly for different response shapes
-        if isinstance(response, dict):
-            choice = response.get("choices", [{}])[0]
-            reply = (
-                choice.get("message", {}).get("content")
-                or choice.get("text")
-                or str(choice)
-            )
-        else:
-            reply = str(response)
+        reply = response.choices[0].message.content
     except Exception as e:
         reply = f"⚠️ Error calling GPT: {str(e)}"
 
