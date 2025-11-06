@@ -5,12 +5,39 @@ import os
 import openai
 from difflib import SequenceMatcher
 import random
+from dotenv import load_dotenv  # <-- NEW
+
+# ==========================
+# Load environment variables from .env
+# ==========================
+# This will read a .env file in the project root (if it exists)
+load_dotenv()
+
+# Read key from .env / environment as OPEN_AI_KEY
+api_key = os.getenv("OPEN_AI_KEY")
+if not api_key:
+    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
+    st.error("❌ No API key found. Please set OPEN_AI_KEY in your .env file.")
+    st.stop()
+
+# Configure OpenAI (classic-style client still works with many versions)
+openai.api_key = api_key
 
 # ==========================
 # Load JSON Data
 # ==========================
-with open("classified_pipeline_tags2.json", "r", encoding="utf-8") as f:
-    DATA = json.load(f)
+try:
+    with open("classified_pipeline_tags2.json", "r", encoding="utf-8") as f:
+        DATA = json.load(f)
+except FileNotFoundError:
+    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
+    st.error("❌ Data file 'classified_pipeline_tags2.json' not found in the app directory.")
+    st.stop()
+except json.JSONDecodeError:
+    st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
+    st.error("❌ 'classified_pipeline_tags2.json' is not valid JSON. "
+             "Make sure it is generated correctly and committed.")
+    st.stop()
 
 PIPELINES = DATA.get("complete_pipeline_flows", {})
 PROCESS_DATA = DATA.get("process_data", {})
@@ -131,18 +158,6 @@ def build_fewshot_examples():
     return examples
 
 # ==========================
-# GPT Setup - FIXED FOR OPENAI 1.x
-# ==========================
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    st.error("❌ No API key found. Please set OPENAI_API_KEY in environment.")
-    st.stop()
-
-# Initialize OpenAI client - FIXED SYNTAX
-# Configure openai with the API key (compatible with openai versions that export a module)
-openai.api_key = api_key
-
-# ==========================
 # Streamlit UI
 # ==========================
 st.set_page_config(page_title="P&ID Analysis Chatbot", layout="wide")
@@ -155,10 +170,14 @@ few_shots = build_fewshot_examples()
 # ==========================
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "system", "content":
-         "You are a process engineer expert in P&ID and HAZOP interpretation. "
-         "Answer questions using provided JSON context. Maintain conversational memory. "
-         "If the user says 'it', 'this pipeline', or 'that instrument', infer from the previous topic."}
+        {
+            "role": "system",
+            "content": (
+                "You are a process engineer expert in P&ID and HAZOP interpretation. "
+                "Answer questions using provided JSON context. Maintain conversational memory. "
+                "If the user says 'it', 'this pipeline', or 'that instrument', infer from the previous topic."
+            ),
+        }
     ] + few_shots
 
 if "last_reference" not in st.session_state:
@@ -200,7 +219,7 @@ if user_input:
     ]
 
     try:
-        # Use the classic ChatCompletion API which is compatible with many openai versions
+        # Classic ChatCompletion API
         response = openai.ChatCompletion.create(
             model="gpt-4o",
             messages=messages,
@@ -210,14 +229,12 @@ if user_input:
         # Extract reply text robustly for different response shapes
         if isinstance(response, dict):
             choice = response.get("choices", [{}])[0]
-            # Newer responses may put content under choice['message']['content']
             reply = (
                 choice.get("message", {}).get("content")
                 or choice.get("text")
                 or str(choice)
             )
         else:
-            # Fallback to string representation
             reply = str(response)
     except Exception as e:
         reply = f"⚠️ Error calling GPT: {str(e)}"
