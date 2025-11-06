@@ -222,7 +222,7 @@ def build_fewshot_examples():
             "role": "assistant",
             "content": (
                 "According to the JSON context, equipment b440 has "
-                'EquipmentSpec "Tank DMPSA 1 m^3 Temp = 50-60°C". '
+                'EquipmentSpec \"Tank DMPSA 1 m^3 Temp = 50-60°C\". '
                 "So the temperature range is 50–60°C."
             ),
         },
@@ -267,7 +267,7 @@ if "system_message" not in st.session_state:
             "- Do NOT say that information is not available if it actually appears "
             "anywhere in the JSON context.\n"
             '- If you genuinely cannot find the information in the JSON, then say '
-            '"this information is not available in the provided data."'
+            "\"this information is not available in the provided data.\""
         ),
     }
 
@@ -303,12 +303,8 @@ for msg in st.session_state.chat_history:
 # Chat Input
 # ==========================
 user_input = st.chat_input("Ask about any equipment, pipeline, or instrument...")
-if user_input:
-    # Update reference context if user refers to 'it' etc.
-    if any(word in user_input.lower() for word in ["it", "this", "that", "its"]):
-        if st.session_state.last_reference:
-            user_input = f"{user_input} (Refers to {st.session_state.last_reference})"
 
+if user_input:
     # Show user message in UI and store in chat_history (MEMORY)
     st.chat_message("user").markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
