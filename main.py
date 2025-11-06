@@ -90,7 +90,7 @@ def find_best_tag_matches(query, data_list, threshold=0.6):
 
 def find_pipeline_matches(query, threshold=0.6):
     """
-    Improved pipeline matcher:
+    Pipeline matcher by pipeline tag name:
     - Direct substring match of pipeline tag in query.
     - Fallback to fuzzy similarity.
     """
@@ -112,14 +112,74 @@ def find_pipeline_matches(query, threshold=0.6):
     return matches
 
 
+# ==========================
+# Tag → Pipelines Reverse Index
+# ==========================
+TAG_TO_PIPELINES = {}
+
+
+def build_tag_index():
+    """
+    Build a reverse index from normalized tag -> set of pipeline IDs
+    for anything that has a tag (equipment, instrumentation, handvalves, nodes)
+    inside pipeline complete_flows.
+    """
+    index = {}
+    for pipe_tag, pipe_info in PIPELINES.items():
+        for step in pipe_info.get("complete_flow", []):
+            step_tag = step.get("tag")
+            details = step.get("details") or {}
+            detail_tag = details.get("Tag")
+
+            for t in {step_tag, detail_tag}:
+                if not t:
+                    continue
+                norm = normalize_tag(t)
+                index.setdefault(norm, set()).add(pipe_tag)
+
+    return index
+
+
+TAG_TO_PIPELINES = build_tag_index()
+
+
+def find_pipelines_for_tag(tag_query: str, threshold: float = 0.7):
+    """
+    Given a tag-like query (e.g. 'hvmkh441' or 'staalname'),
+    return all pipelines that contain that tag anywhere in their flow.
+    """
+    results = {}
+    if not tag_query:
+        return results
+
+    q_norm = normalize_tag(tag_query)
+    if not q_norm:
+        return results
+
+    # 1) direct hit
+    direct = TAG_TO_PIPELINES.get(q_norm, set())
+    for p_tag in direct:
+        if p_tag in PIPELINES:
+            results[p_tag] = PIPELINES[p_tag]
+
+    # 2) fuzzy / partial hit
+    for t_norm, pipe_ids in TAG_TO_PIPELINES.items():
+        if t_norm in q_norm or q_norm in t_norm or similarity(q_norm, t_norm) >= threshold:
+            for p_tag in pipe_ids:
+                if p_tag in PIPELINES:
+                    results[p_tag] = PIPELINES[p_tag]
+
+    return results
+
+
 def build_local_context(query):
     """
     Build a local context tailored to the query:
     - Matches equipment/instrumentation/handvalves by tag or similarity.
-    - Matches pipelines by tag or similarity.
+    - Matches pipelines either by pipeline tag or because they contain a
+      referenced equipment / instrument / node tag.
     - When a pipeline is matched, also pulls its start/end equipment details
-      into the equipment context so things like temperature/capacity of B440
-      are available.
+      into the equipment context.
     """
     context = {"equipment": [], "instrumentation": [], "handvalves": [], "pipelines": {}}
     q = query.lower()
@@ -134,14 +194,35 @@ def build_local_context(query):
         context["handvalves"] = PROCESS_DATA.get("HandValves", [])
     else:
         # Specific tag / free-text search
-        context["equipment"] = find_best_tag_matches(query, PROCESS_DATA.get("Equipment", []))
+        context["equipment"] = find_best_tag_matches(
+            query, PROCESS_DATA.get("Equipment", [])
+        )
         context["instrumentation"] = find_best_tag_matches(
             query, PROCESS_DATA.get("Instrumentation", [])
         )
         context["handvalves"] = find_best_tag_matches(
             query, PROCESS_DATA.get("HandValves", [])
         )
+        # Match by pipeline tag
         context["pipelines"] = find_pipeline_matches(query)
+
+    # Also search pipelines that contain the mentioned tags (incl. nodes like 'staalname')
+    extra_pipes = {}
+
+    # 1) try using the raw user query as a tag-like string
+    extra_pipes.update(find_pipelines_for_tag(query))
+
+    # 2) try using any matched equipment / instrumentation / handvalve tags
+    for section in ["equipment", "instrumentation", "handvalves"]:
+        for item in context[section]:
+            t = item.get("Tag", "")
+            extra_pipes.update(find_pipelines_for_tag(t))
+
+    # Merge explicit matches + extra pipes
+    if context["pipelines"]:
+        context["pipelines"].update(extra_pipes)
+    else:
+        context["pipelines"] = extra_pipes
 
     # If pipelines were matched, pull their start/end equipment into equipment context
     if context["pipelines"]:
@@ -162,7 +243,8 @@ def build_local_context(query):
 def summarize_context(context):
     """
     Turn the local context into a compact, very-readable text
-    so the model can easily see specs like temperature and capacity.
+    so the model can easily see specs like temperature and capacity,
+    as well as which tags sit on which pipelines and key nodes.
     """
     lines = []
 
@@ -186,7 +268,8 @@ def summarize_context(context):
         lines.append("Hand valves:")
         for h in context["handvalves"]:
             tag = h.get("Tag", "")
-            code = h.get("Code", "")
+            # Different JSONs may use Code or ValveCode, try both
+            code = h.get("Code", h.get("ValveCode", ""))
             normally = h.get("Normally", "")
             lines.append(f"- {tag} (code {code}, normally {normally})")
 
@@ -199,56 +282,29 @@ def summarize_context(context):
             e_tag = (end.get("details") or {}).get("Tag") or end.get("tag", "unknown")
             lines.append(f"- {tag}: from {s_tag} to {e_tag}")
 
+            # Highlight nodes and important tags on this pipeline
+            flow = info.get("complete_flow", [])
+            for step in flow:
+                if step.get("category") == "node":
+                    node_tag = step.get("tag", "")
+                    if node_tag:
+                        lines.append(f"  • node '{node_tag}' is present in pipeline {tag}")
+                elif step.get("category") == "instrumentation":
+                    inst_details = step.get("details") or {}
+                    inst_tag = inst_details.get("Tag") or step.get("tag", "")
+                    if inst_tag:
+                        lines.append(f"  • instrumentation '{inst_tag}' is on pipeline {tag}")
+                elif step.get("category") == "handvalve":
+                    hv_details = step.get("details") or {}
+                    hv_tag = hv_details.get("Tag") or step.get("tag", "")
+                    if hv_tag:
+                        lines.append(f"  • handvalve '{hv_tag}' is on pipeline {tag}")
+
     if not lines:
         return "No matching data found in plant model."
 
     return "\n".join(lines)
 
-# ==========================
-# Few-Shot Examples (STATIC)
-# Used only for the model, not shown in UI
-# ==========================
-def build_fewshot_examples():
-    """
-    Static few-shots that demonstrate how to read EquipmentSpec
-    and answer about temperature / capacity from the JSON context.
-    """
-    return [
-        {
-            "role": "user",
-            "content": "What is the temperature range of equipment b440?",
-        },
-        {
-            "role": "assistant",
-            "content": (
-                "According to the JSON context, equipment b440 has "
-                'EquipmentSpec \"Tank DMPSA 1 m^3 Temp = 50-60°C\". '
-                "So the temperature range is 50–60°C."
-            ),
-        },
-        {
-            "role": "user",
-            "content": "What is the capacity of equipment b440?",
-        },
-        {
-            "role": "assistant",
-            "content": (
-                "From the same EquipmentSpec for b440, the tank capacity is 1 m^3."
-            ),
-        },
-        {
-            "role": "user",
-            "content": "If the information is not in the JSON, what should you say?",
-        },
-        {
-            "role": "assistant",
-            "content": (
-                "If the requested detail is not present anywhere in the provided JSON "
-                "context, I should clearly say that this specific information is not "
-                "available in the data."
-            ),
-        },
-    ]
 
 # ==========================
 # Session State Initialization (MEMORY)
@@ -263,16 +319,15 @@ if "system_message" not in st.session_state:
             "- Carefully read EquipmentSpec and other fields for matching tags.\n"
             "- For questions about temperature, capacity, volume, or operating range, "
             "extract these values directly from EquipmentSpec.\n"
+            "- For questions like 'where is X' or 'on which pipeline is X', "
+            "identify where that tag appears in the pipelines and nodes.\n"
             "- Use the entire conversation history to keep track of context.\n"
             "- Do NOT say that information is not available if it actually appears "
-            "anywhere in the JSON context.\n"
-            '- If you genuinely cannot find the information in the JSON, then say '
+            "anywhere in the JSON context provided to you.\n"
+            "- If you genuinely cannot find the information in the JSON, then say "
             "\"this information is not available in the provided data.\""
         ),
     }
-
-if "few_shots" not in st.session_state:
-    st.session_state.few_shots = build_fewshot_examples()
 
 # chat_history: ONLY real user & assistant messages that should be displayed and used as memory
 if "chat_history" not in st.session_state:
@@ -293,7 +348,7 @@ with col1:
 
 # ==========================
 # Display previous conversation
-# (only user + assistant messages, no system, no few-shots)
+# (only user + assistant messages, no system)
 # ==========================
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"]):
@@ -313,7 +368,7 @@ if user_input:
     context = build_local_context(user_input)
     context_text = summarize_context(context)
 
-    # Track last referenced tag (prefer equipment tag)
+    # Track last referenced tag (prefer equipment tag, else first pipeline)
     if context["equipment"]:
         st.session_state.last_reference = context["equipment"][0].get("Tag", None)
     elif context["pipelines"]:
@@ -325,7 +380,6 @@ if user_input:
     # ==========================
     messages = (
         [st.session_state.system_message]
-        + st.session_state.few_shots
         + st.session_state.chat_history
         + [
             {
