@@ -1,0 +1,7 @@
+IndexName,ColumnName
+DL_RowId,RowId
+DL_DwgHandle,DwgId
+DL_DwgHandle,DwgHandleLow
+DL_DwgHandle,DwgHandleHigh
+PnPAutoGenPropIdx,PnPDrawingGuid
+PnPDrawingCustomPropertiesIdx,PnPDrawingGuid

@@ -1,0 +1,3 @@
+RelationshipTypeName,PropertyName,PropertyType
+LineStartLine,ParamOnLine,System.Double
+LineEndLine,ParamOnLine,System.Double

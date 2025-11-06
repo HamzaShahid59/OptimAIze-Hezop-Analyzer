@@ -1,0 +1,3 @@
+PnPDrawingGuid,Name,Description,DisplayName,LastUsedValue,Increment,PnPID
+PROJECT,LastPumpValue,Last Pump Number counter,LastPumpValue,90,10,3
+PROJECT,LastValveNumber,Last Valve Number used in this project,Last Valve Number,102,1,4

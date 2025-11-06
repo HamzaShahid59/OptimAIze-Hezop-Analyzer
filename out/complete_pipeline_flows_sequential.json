@@ -1,0 +1,313 @@
+{
+  "020.001.1-0-4752.5183-15/25HB25T01B1": {
+    "pipeline_tag": "020.001.1-0-4752.5183-15/25HB25T01B1",
+    "start": "B-439",
+    "end": "B-440",
+    "complete_flow": [
+      "B-439",
+      "15",
+      "GO H439 HVM K H439",
+      "B-440"
+    ],
+    "total_connections": 3,
+    "flow_length": 4,
+    "all_connections": [
+      {
+        "from": "B-439",
+        "to": "15"
+      },
+      {
+        "from": "15",
+        "to": "GO H439 HVM K H439"
+      },
+      {
+        "from": "15",
+        "to": "B-440"
+      }
+    ]
+  },
+  "020.007.1-0-4752.5183-50/HB25T01B1": {
+    "pipeline_tag": "020.007.1-0-4752.5183-50/HB25T01B1",
+    "start": "B-440",
+    "end": "RELEASE",
+    "complete_flow": [
+      "B-440",
+      "RELEASE"
+    ],
+    "total_connections": 1,
+    "flow_length": 2,
+    "all_connections": [
+      {
+        "from": "B-440",
+        "to": "RELEASE"
+      }
+    ]
+  },
+  "020.002.1-0-4752.5183-15/25HB25T01B1": {
+    "pipeline_tag": "020.002.1-0-4752.5183-15/25HB25T01B1",
+    "start": "B-440",
+    "end": "B-441",
+    "complete_flow": [
+      "B-440",
+      "15",
+      "GO H440 HVM K H440",
+      "B-441"
+    ],
+    "total_connections": 3,
+    "flow_length": 4,
+    "all_connections": [
+      {
+        "from": "B-440",
+        "to": "15"
+      },
+      {
+        "from": "15",
+        "to": "GO H440 HVM K H440"
+      },
+      {
+        "from": "15",
+        "to": "B-441"
+      }
+    ]
+  },
+  "020.008.1-0-4752.5183-50/25HB25T01B1": {
+    "pipeline_tag": "020.008.1-0-4752.5183-50/25HB25T01B1",
+    "start": "B-441",
+    "end": "RELEASE",
+    "complete_flow": [
+      "B-441",
+      "RELEASE"
+    ],
+    "total_connections": 1,
+    "flow_length": 2,
+    "all_connections": [
+      {
+        "from": "B-441",
+        "to": "RELEASE"
+      }
+    ]
+  },
+  "020.003.1-0-4752.5183-15/25HB25T01B1-W35": {
+    "pipeline_tag": "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+    "start": "B-441",
+    "end": "V940807-T-451",
+    "complete_flow": [
+      "B-441",
+      "F",
+      "15 H672B1V",
+      "15 H672B1",
+      "TIS +A++ T441",
+      "15 H672B1V",
+      "P-441",
+      "PICA+ P441",
+      "15 H672B1",
+      "15 H672B1V OV63",
+      "15 H672B1V",
+      "15",
+      "GO H441 HVM K H441",
+      "FIR F463",
+      "FVK F464-1",
+      "15 H672B1V",
+      "15 H672B1V",
+      "PI P446",
+      "NK NU442",
+      "V940807-T-451"
+    ],
+    "total_connections": 19,
+    "flow_length": 20,
+    "all_connections": [
+      {
+        "from": "B-441",
+        "to": "F"
+      },
+      {
+        "from": "F",
+        "to": "15 H672B1V"
+      },
+      {
+        "from": "15 H672B1V",
+        "to": "15 H672B1"
+      },
+      {
+        "from": "15 H672B1",
+        "to": "TIS +A++ T441"
+      },
+      {
+        "from": "TIS +A++ T441",
+        "to": "15 H672B1V"
+      },
+      {
+        "from": "15 H672B1V",
+        "to": "P-441"
+      },
+      {
+        "from": "P-441",
+        "to": "PICA+ P441"
+      },
+      {
+        "from": "PICA+ P441",
+        "to": "15 H672B1"
+      },
+      {
+        "from": "15 H672B1",
+        "to": "15 H672B1V OV63"
+      },
+      {
+        "from": "15 H672B1V OV63",
+        "to": "15 H672B1V"
+      },
+      {
+        "from": "15 H672B1V",
+        "to": "15"
+      },
+      {
+        "from": "15",
+        "to": "GO H441 HVM K H441"
+      },
+      {
+        "from": "GO H441 HVM K H441",
+        "to": "FIR F463"
+      },
+      {
+        "from": "FIR F463",
+        "to": "FVK F464-1"
+      },
+      {
+        "from": "FVK F464-1",
+        "to": "15 H672B1V"
+      },
+      {
+        "from": "15 H672B1V",
+        "to": "15 H672B1V"
+      },
+      {
+        "from": "15 H672B1V",
+        "to": "PI P446"
+      },
+      {
+        "from": "PI P446",
+        "to": "NK NU442"
+      },
+      {
+        "from": "NK NU442",
+        "to": "V940807-T-451"
+      }
+    ]
+  },
+  "020.005.1-0-1020.7056-25/10HA25F01B1": {
+    "pipeline_tag": "020.005.1-0-1020.7056-25/10HA25F01B1",
+    "start": "Compressorlucht P= 7 bar 17",
+    "end": "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+    "complete_flow": [
+      "Compressorlucht P= 7 bar 17",
+      "25 H672B1V",
+      "25",
+      "PIA+ P444",
+      "15",
+      "GO H442 HVM K H442",
+      "15 H672B1",
+      "020.003.1-0-4752.5183-15/25HB25T01B1-W35"
+    ],
+    "total_connections": 7,
+    "flow_length": 8,
+    "all_connections": [
+      {
+        "from": "Compressorlucht P= 7 bar 17",
+        "to": "25 H672B1V"
+      },
+      {
+        "from": "25 H672B1V",
+        "to": "25"
+      },
+      {
+        "from": "25",
+        "to": "PIA+ P444"
+      },
+      {
+        "from": "PIA+ P444",
+        "to": "15"
+      },
+      {
+        "from": "15",
+        "to": "GO H442 HVM K H442"
+      },
+      {
+        "from": "15",
+        "to": "15 H672B1"
+      },
+      {
+        "from": "15 H672B1",
+        "to": "020.003.1-0-4752.5183-15/25HB25T01B1-W35"
+      }
+    ]
+  },
+  "020.004.1-0-4752.5183-12mm": {
+    "pipeline_tag": "020.004.1-0-4752.5183-12mm",
+    "start": "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+    "end": "B-441",
+    "complete_flow": [
+      "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+      "15",
+      "H672B1",
+      "OV61",
+      "OV62",
+      "Staalname",
+      "B-441"
+    ],
+    "total_connections": 6,
+    "flow_length": 7,
+    "all_connections": [
+      {
+        "from": "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+        "to": "15"
+      },
+      {
+        "from": "15",
+        "to": "H672B1"
+      },
+      {
+        "from": "15",
+        "to": "OV61"
+      },
+      {
+        "from": "15",
+        "to": "OV62"
+      },
+      {
+        "from": "OV62",
+        "to": "Staalname"
+      },
+      {
+        "from": "Staalname",
+        "to": "B-441"
+      }
+    ]
+  },
+  "020.006.1-0-120.7056-12mm": {
+    "pipeline_tag": "020.006.1-0-120.7056-12mm",
+    "start": "020.005.1-0-1020.7056-25/10HA25F01B1",
+    "end": "020.003.1-0-4752.5183-15/25HB25T01B1-W35",
+    "complete_flow": [
+      "020.005.1-0-1020.7056-25/10HA25F01B1",
+      "FI",
+      "12",
+      "020.003.1-0-4752.5183-15/25HB25T01B1-W35"
+    ],
+    "total_connections": 3,
+    "flow_length": 4,
+    "all_connections": [
+      {
+        "from": "020.005.1-0-1020.7056-25/10HA25F01B1",
+        "to": "FI"
+      },
+      {
+        "from": "FI",
+        "to": "12"
+      },
+      {
+        "from": "12",
+        "to": "020.003.1-0-4752.5183-15/25HB25T01B1-W35"
+      }
+    ]
+  }
+}

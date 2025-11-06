@@ -1,0 +1,16 @@
+PnPID,VesselName,D1,D2,D3,D4,D5,D6,D7,N1,N2,N3,N4,N5,N6,N7,N8,N9,VOLUME,DMP,TEMP
+3404,,,,,,,,,,,,,,,,,,,,
+3406,LKW-LOSPLAATS VOLGENS RICHTLIJNEN,,,,,,,,,,,,,,,,,,,
+3426,,,,,,,,,,,,,,,,,,,,
+3472,1,opslagtank,Inh.: 100m3,GVK-Dubbelwandig,"Drukloos, +60/-25 mbar",,,,1,5,4,8,2,9,7,15,6,100 M3,80% DMP,30-40 C
+3474,,opslagtank,Inh.: 100m3,GVK-Dubbelwandig,"Drukloos, +60/-25 mbar",,,,5,1,8,4,2,9,7,15,6,100 M3,85% FZ,30-40 C
+3478,,Buffervat,Inh.1 m3,1.4571,Drukloos,,,,N1,N2,N3,N4,N5,N6,,,,,,
+3890,,Buffervat,Inh.1 m3,1.4571,Drukloos,,,,N1,N2,N3,N4,N5,N6,N7,,,1.0 M3,,
+4115,,IBC voor reswater,Inh.: 1m3,PVC met stalen frame,Drukloos,,,,,,,,,,,,,,,
+4117,,Weegschaal voor IBC,,,,,,,,,,,,,,,,,,
+4290,Spoelwater,IBC voor spoelwater,Inh.: 1m^3,PVC met stalen frame,Drukloos,,,,,,,,,,,,,,,
+4292,Verf,IBC voor verf,Inh.: 1m^3,PVC met stalen frame,Drukloos,,,,,,,,,,,,,,,
+7202,,IBC voor reswater,Inh.: 1m3,PVC met stalen frame,Drukloos,,,,,,,,,,,,,,,
+9373,,,,,,,,,,,,,,,,,,,,
+9835,,Actief koolfilter,1 m3,1.4571,,,,,,,,,,,,,,,,
+10171,,reactor,Inh.:0.5 m3,1.4571,"Drukloos, +50/-10 mbar",,,,N1,N2,N3,N4,N5,N6,N7,N8,N9,0.5 M3,,

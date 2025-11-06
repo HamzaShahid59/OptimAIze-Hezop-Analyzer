@@ -1,0 +1,4 @@
+PnPID,StyleName,ColorBy,StyleDecription,PropertyTableName
+457,Off Spec Piping,Spec Status,Highlight Off Spec P&ID objects. (System Style for Spec Driven P&ID Projects),
+460,Color by Service,Service,Trace the piping system across P&IDs,PipeLineGroup
+529,Color by Size,Size,Highlight piping lines by size,PipeLines

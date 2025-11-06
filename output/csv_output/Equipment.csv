@@ -1,0 +1,20 @@
+PnPID,Tag,Type,EquipmentSpec,Weight,MaterialOfConstruction,Number,Area
+0,,A,,,,,
+11905,B-439,B,"Losstation DMPSA
+1 m^3",,,439,
+12004,LEKBAK-001,LEKBAK,,,,001,
+12035,B-440,B,"Tank DMPSA
+1 m^3
+Temp = 50-60°C",,,440,
+12038,M-440,M,,,,440,
+12116,LEKBAK-002,LEKBAK,,,,002,
+12139,B-441,B,"Tank DMPSA
+1 m^3
+Temp = 50-60°C",,,441,
+12184,V940807-T-451,V940807-T,,,,451,
+12187,LEKBAK-003,LEKBAK,,,,003,
+12416,P-441,P,"KRAL Spindelpomp
+KF 20.BCC+90/4-1,5
+dP = 14,4 bar
+E-Motor
+1,5kW, 1420t/min",,,441,

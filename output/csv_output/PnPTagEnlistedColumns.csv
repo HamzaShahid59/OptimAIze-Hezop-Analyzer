@@ -1,0 +1,6 @@
+TagRegistyName,TableName,ColumnName,PnPID
+PnPTagRegistry,Equipment,Tag,450
+PnPTagRegistry,Nozzles,Tag,451
+PnPTagRegistry,HandValves,Tag,452
+PnPTagRegistry,Instrumentation,Tag,453
+PnPTagRegistry,PipeLineGroup,Tag,454

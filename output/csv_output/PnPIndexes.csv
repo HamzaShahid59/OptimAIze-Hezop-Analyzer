@@ -1,0 +1,5 @@
+IndexName,TableName,IsUnique
+DL_RowId,PnPDataLinks,FALSE
+DL_DwgHandle,PnPDataLinks,FALSE
+PnPAutoGenPropIdx,PnPAutoGenProperties,FALSE
+PnPDrawingCustomPropertiesIdx,PnPDrawingCustomProperties,FALSE
