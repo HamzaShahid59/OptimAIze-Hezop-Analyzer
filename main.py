@@ -16,7 +16,6 @@ st.title("🧠 P&ID Analysis Chatbot")
 # ==========================
 # Load environment variables from .env
 # ==========================
-# This will read a .env file in the project root (if it exists)
 load_dotenv()
 
 # Read key from .env / environment as OPEN_AI_KEY
@@ -190,7 +189,9 @@ def build_fewshot_examples():
 # ==========================
 # Memory Initialization
 # ==========================
-few_shots = build_fewshot_examples()
+# Build few-shots ONCE and keep them in session_state
+if "few_shots" not in st.session_state:
+    st.session_state.few_shots = build_fewshot_examples()
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
@@ -201,17 +202,26 @@ if "messages" not in st.session_state:
                 "Answer questions using provided JSON context. Maintain conversational memory. "
                 "If the user says 'it', 'this pipeline', or 'that instrument', infer from the previous topic."
             ),
-        }
-    ] + few_shots
+        },
+        *st.session_state.few_shots,
+    ]
 
 if "last_reference" not in st.session_state:
     st.session_state.last_reference = None  # track last tag discussed
 
-# Display previous conversation (excluding few-shots)
+# ==========================
+# Display previous conversation (hide few-shots)
+# ==========================
 for msg in st.session_state.messages:
-    if msg["role"] != "system" and msg not in few_shots:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    # hide system message
+    if msg["role"] == "system":
+        continue
+    # hide few-shot examples
+    if msg in st.session_state.few_shots:
+        continue
+
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 # ==========================
 # Chat Input
@@ -237,7 +247,7 @@ if user_input:
     if context["pipelines"]:
         st.session_state.last_reference = list(context["pipelines"].keys())[0]
 
-    # Combine messages
+    # Combine messages (system + few-shots + real chat so far)
     messages = st.session_state.messages + [
         {"role": "system", "content": f"Relevant plant data:\n{context_text}"}
     ]
